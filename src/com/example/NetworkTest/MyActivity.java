@@ -2,6 +2,7 @@ package com.example.NetworkTest;
 
 import android.app.Activity;
 import android.app.PendingIntent;
+import android.content.Entity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
@@ -11,7 +12,13 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.params.HttpParams;
+import org.apache.http.util.EntityUtils;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -27,19 +34,20 @@ public class MyActivity extends Activity implements View.OnClickListener {
     private Button sendRequest;
     private TextView reponseText;
     private Handler handler = new Handler() {
-    //HandleMessage方法对Message进行处理，最终把结果设置到TextView上
-    public void handleMessage(Message msg) {
-        Log.d("MyActivity", "ssssssssssssss");
-        switch (msg.what) {
-            case SHOW_RESPONSE:
-                String response = (String) msg.obj;
-                //在这里进行UI操作，将结果显示到界面上
-                reponseText.setText(response);
+        //HandleMessage方法对Message进行处理，最终把结果设置到TextView上
+        public void handleMessage(Message msg) {
+            Log.d("MyActivity", "ssssssssssssss");
+            switch (msg.what) {
+                case SHOW_RESPONSE:
+                    String response = (String) msg.obj;
+                    //在这里进行UI操作，将结果显示到界面上
+                    reponseText.setText(response);
 
+            }
         }
-    }
 
-};
+    };
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -52,10 +60,35 @@ public class MyActivity extends Activity implements View.OnClickListener {
 
     @Override
     public void onClick(View v) {
-        if(v.getId() == R.id.send_request){
-            sendRequestWithHttpURLConnection();
-
+        if (v.getId() == R.id.send_request) {
+            //       sendRequestWithHttpURLConnection();
+            sendRequestWithHttpClient();
         }
+    }
+
+    private void sendRequestWithHttpClient() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    HttpClient httpClient = new DefaultHttpClient();
+                    HttpGet httpGet = new HttpGet("http://www.baidu.com");
+                    HttpResponse httpResponse = httpClient.execute(httpGet);
+                    if (httpResponse.getStatusLine().getStatusCode() == 200) {
+                        //请求和响应都成功了
+                        HttpEntity entity = httpResponse.getEntity();
+                        String response = EntityUtils.toString(entity, "utf-8");
+                        Message message = new Message();
+                        message.what = SHOW_RESPONSE;
+                        //将服务器返回的结果存放到Message中
+                        message.obj = response.toString();
+                        handler.sendMessage(message);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
     }
 
     private void sendRequestWithHttpURLConnection() {
@@ -65,10 +98,10 @@ public class MyActivity extends Activity implements View.OnClickListener {
             @Override
             public void run() {
                 HttpURLConnection connection = null;
-                try{
+                try {
                     //发送一条HTTP请求，目标地址是百度的首页
                     URL rul = new URL("http://www.baidu.com");
-                    connection = (HttpURLConnection)rul.openConnection();
+                    connection = (HttpURLConnection) rul.openConnection();
                     //HTTP请求数据方法GET/提交数据POST
                     connection.setRequestMethod("GET");
                     //提交数据格式
@@ -82,7 +115,7 @@ public class MyActivity extends Activity implements View.OnClickListener {
                     BufferedReader reader = new BufferedReader(new InputStreamReader(in));
                     StringBuilder response = new StringBuilder();
                     String line;
-                    while((line = reader.readLine()) != null){
+                    while ((line = reader.readLine()) != null) {
                         response.append(line);
                     }
 
@@ -93,10 +126,10 @@ public class MyActivity extends Activity implements View.OnClickListener {
                     //Handler将它发送出去
                     handler.sendMessage(message);
 
-                }catch(Exception e){
+                } catch (Exception e) {
                     e.printStackTrace();
-                }finally {
-                    if(connection != null){
+                } finally {
+                    if (connection != null) {
                         connection.disconnect();
                     }
                 }
