@@ -1,9 +1,6 @@
 package com.example.NetworkTest;
 
 import android.app.Activity;
-import android.app.PendingIntent;
-import android.content.Entity;
-import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -14,15 +11,18 @@ import android.widget.TextView;
 import android.widget.Toast;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.params.HttpParams;
 import org.apache.http.util.EntityUtils;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserFactory;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.StringReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
@@ -31,18 +31,17 @@ public class MyActivity extends Activity implements View.OnClickListener {
      * Called when the activity is first created.
      */
     public static final int SHOW_RESPONSE = 0;
+    public static final boolean sbc = true;
     private Button sendRequest;
     private TextView reponseText;
     private Handler handler = new Handler() {
         //HandleMessage方法对Message进行处理，最终把结果设置到TextView上
         public void handleMessage(Message msg) {
-            Log.d("MyActivity", "ssssssssssssss");
             switch (msg.what) {
                 case SHOW_RESPONSE:
                     String response = (String) msg.obj;
                     //在这里进行UI操作，将结果显示到界面上
                     reponseText.setText(response);
-
             }
         }
 
@@ -55,7 +54,6 @@ public class MyActivity extends Activity implements View.OnClickListener {
         sendRequest = (Button) findViewById(R.id.send_request);
         reponseText = (TextView) findViewById(R.id.response);
         sendRequest.setOnClickListener(this);
-
     }
 
     @Override
@@ -67,32 +65,98 @@ public class MyActivity extends Activity implements View.OnClickListener {
     }
 
     private void sendRequestWithHttpClient() {
+        //  Toast.makeText(getApplicationContext(),"ssssss",Toast.LENGTH_SHORT).show();
         new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
+
                     HttpClient httpClient = new DefaultHttpClient();
-                    HttpGet httpGet = new HttpGet("http://www.baidu.com");
+
+                    //指定访问的服务器地址是电脑本机
+                    HttpGet httpGet = new HttpGet("http://172.19.0.24/get_data.xml");
+
+                    //   HttpGet httpGet = new HttpGet("http://www.baidu.com");
                     HttpResponse httpResponse = httpClient.execute(httpGet);
-                    if (httpResponse.getStatusLine().getStatusCode() == 200) {
+//httpResponse.getStatusLine().getStatusCode() == HttpStatus.SC_ACCEPTED
+
+                //    if (sbc) {
+
                         //请求和响应都成功了
                         HttpEntity entity = httpResponse.getEntity();
                         String response = EntityUtils.toString(entity, "utf-8");
-                        Message message = new Message();
-                        message.what = SHOW_RESPONSE;
+                        parseXMLWithPull(response);
+//                        Message message = new Message();
+//                        message.what = SHOW_RESPONSE;
                         //将服务器返回的结果存放到Message中
-                        message.obj = response.toString();
-                        handler.sendMessage(message);
-                    }
+//                        message.obj = response.toString();
+//                        handler.sendMessage(message);
+                 //   }
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
         }).start();
     }
+            private void parseXMLWithPull(String xmlData) {
+
+                Log.d(MyActivity.ACTIVITY_SERVICE, "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS");
+
+                try{
+                    XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+                    XmlPullParser xmlPullParser = factory.newPullParser();
+                    //setInput方法将服务器返回的XML数据设置进去就可以开始解析了
+                    xmlPullParser.setInput(new StringReader(xmlData));
+                    //得到当前解析的事件
+                    int eventType = xmlPullParser.getEventType();
+                    String id = "";
+                    String name = "";
+                    String version = "";
+                    //while循环不断的解析
+                    //如果当前的解析事件不等于 XmlPullParser.END_DOCUMENT，
+                    // 说明解 析工作还没完成
+                    while(eventType != XmlPullParser.END_DOCUMENT){
+                        //通过 getName()方法得到当前结点的名
+                        String nodeName = xmlPullParser.getName();
+                        //调用 next()方法后可以获取下一个解析事件
+                        switch (eventType){
+                            //开始解析某个节点
+                            //结点名等于 id、name 或 version
+                            //调用 nextText()方法来获取结点内具体的内容
+                            case XmlPullParser.START_TAG:{
+                                if("id".equals(nodeName)){
+                                    id = xmlPullParser.nextText();
+                                }else if("name".equals(nodeName)){
+                                    name = xmlPullParser.nextText();
+                                }else if ("version".equals(nodeName)){
+                                    version = xmlPullParser.nextText();
+                                }
+                                break;
+                            }
+                            //完成解析某个节点
+                            case XmlPullParser.END_TAG:{
+                                //当解析完一个 app 结点后就将获取到的内容打印出来
+                                if("app".equals(nodeName)){
+                                    Log.d("MainActivity","id is " + id);
+                                    Log.d("MainActivity","name is " + name);
+                                    Log.d("MainActivity","version is" + version);
+                                }
+                                break;
+                            }
+                            default:
+                                break;
+                        }
+                        eventType = xmlPullParser.next();
+                    }
+
+                }catch (Exception e){
+                    e.printStackTrace();
+                }
+            }
+
+
 
     private void sendRequestWithHttpURLConnection() {
-
         //开启线程来发起网络请求
         new Thread(new Runnable() {
             @Override
